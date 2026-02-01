@@ -1,139 +1,86 @@
-# 📥 Installation Guide
+# 📥 Cài đặt npmrtdb
 
-## Quick Install
-
-### Global Installation (Recommended)
+## 🚀 Quick Install
 
 ```bash
-npm install -g npmrtdb
-```
-
-After installation, you can use `npmrtdb` and `npmxrtdb` from anywhere.
-
-### Local Installation
-
-```bash
-npm install npmrtdb
-```
-
-Then use via npx:
-
-```bash
-npx npmrtdb --db <url> install lodash
-npx npmxrtdb --db <url> cowsay "Hello"
-```
-
-### Direct Usage (No Installation)
-
-```bash
-npx npmrtdb --db <url> install lodash
-```
-
-## From Source
-
-1. **Clone or download the project**
-
-```bash
-# Extract the zip file
-unzip npmrtdb.zip
+# Từ thư mục project
 cd npmrtdb
-```
-
-2. **Install dependencies**
-
-```bash
 npm install
-```
-
-3. **Link globally**
-
-```bash
 npm link
 ```
 
-4. **Verify installation**
+## ✅ Verify
 
 ```bash
 npmrtdb --help
 npmxrtdb --help
 ```
 
-## Requirements
-
-- **Node.js**: 18.0.0 or higher
-- **npm**: Comes with Node.js
-- **Operating System**: Windows, Linux, or macOS
-
-## Verification
-
-Test the installation:
+## 🧪 Test
 
 ```bash
-# Check version
-npmrtdb --help | head -n 1
-npmxrtdb --help | head -n 1
-
-# Test with a simple command
-npmrtdb --db https://example.com/db.json --help
+npm test
 ```
 
-## Troubleshooting
-
-### "command not found" after global install
-
-Make sure npm global bin directory is in your PATH:
+Hoặc:
 
 ```bash
-# Check npm global bin path
-npm bin -g
-
-# Add to PATH (Linux/macOS)
-export PATH="$(npm bin -g):$PATH"
-
-# Add to PATH (Windows, in PowerShell)
-$env:PATH += ";$(npm bin -g)"
+node test.js
 ```
 
-### Permission errors on Linux/macOS
-
-Use `sudo` for global installation:
+## 📦 Publish (Optional)
 
 ```bash
-sudo npm install -g npmrtdb
+npm publish
 ```
 
-Or configure npm to use a different directory:
+## 🔧 Uninstall
 
 ```bash
-mkdir ~/.npm-global
-npm config set prefix '~/.npm-global'
-export PATH=~/.npm-global/bin:$PATH
-npm install -g npmrtdb
+npm unlink
 ```
 
-### Windows: "cannot be loaded because running scripts is disabled"
+---
 
-Enable script execution in PowerShell:
+## 💡 Development Tips
 
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-## Updating
+### Test locally without linking
 
 ```bash
-npm update -g npmrtdb
+node bin/npmrtdb.js --help
+node bin/npmxrtdb.js --help
 ```
 
-## Uninstalling
+### Debug mode
 
 ```bash
-npm uninstall -g npmrtdb
+npmrtdb --debug --db <url> install lodash
 ```
 
-## Next Steps
+---
 
-After installation, check out:
-- [Quick Start Guide](QUICKSTART.md)
-- [Full Documentation](README.md)
-- [Example Configuration](example-db.json)
+## ⚙️ Requirements
+
+- Node.js ≥ 18.0.0
+- npm (đi kèm Node.js)
+
+---
+
+## 🌐 Database URL
+
+Có thể dùng:
+
+- File local: `file:///path/to/db.json`
+- HTTP/HTTPS: `https://example.com/db.json`
+
+Set env:
+
+```bash
+export MHNPM_DB_URL="https://example.com/db.json"
+```
+
+Hoặc dùng flag:
+
+```bash
+npmrtdb --db https://example.com/db.json install lodash
+```

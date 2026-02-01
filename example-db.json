@@ -1,12 +1,10 @@
 {
-  "hosts": [
-    {
-      "name": "npmjs",
+  "hosts": {
+    "npmjs": {
       "registry": "https://registry.npmjs.org/",
       "enabled": true
     },
-    {
-      "name": "github",
+    "github": {
       "registry": "https://npm.pkg.github.com/",
       "scope": "@myorg",
       "auth": {
@@ -15,20 +13,16 @@
       },
       "enabled": true
     },
-    {
-      "name": "gitea",
+    "gitea": {
       "registry": "https://gitea.example.com/api/packages/myorg/npm/",
       "auth": {
         "tokenEnv": "GITEA_TOKEN",
         "alwaysAuth": false
       },
-      "npmrcExtras": [
-        "strict-ssl=false"
-      ],
+      "npmrcExtras": ["strict-ssl=false"],
       "enabled": true
     },
-    {
-      "name": "codeberg",
+    "codeberg": {
       "registry": "https://codeberg.org/api/packages/myorg/npm/",
       "auth": {
         "tokenEnv": "CODEBERG_TOKEN",
@@ -36,5 +30,5 @@
       },
       "enabled": false
     }
-  ]
+  }
 }

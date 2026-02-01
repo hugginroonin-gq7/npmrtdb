@@ -87,9 +87,9 @@ NOTES:
 `;
 
 export function showHelp(toolName) {
-  if (toolName === 'npmrtdb') {
+  if (toolName === "npmrtdb") {
     console.log(NPMRTDB_HELP);
-  } else if (toolName === 'npmxrtdb') {
+  } else if (toolName === "npmxrtdb") {
     console.log(NPMXRTDB_HELP);
   }
 }

@@ -1,79 +1,77 @@
 # 📦 npmrtdb
 
-Multi-host NPM/NPX wrapper with concurrent registry attempts and public-first strategy.
+Multi-host NPM/NPX wrapper - ủy quyền npm CLI xử lý toàn bộ network operations.
 
-## 🎯 Features
+## 🎯 Đặc điểm
 
-✅ **Concurrent execution** - Try multiple npm registries simultaneously for maximum speed  
-✅ **Public-first strategy** - Attempt public access before falling back to authenticated requests  
-✅ **Smart version selection** - Choose any available version or pin to the latest based on digit comparison  
-✅ **Cross-platform** - Works on Windows, Linux, and macOS  
-✅ **Zero configuration changes** - Doesn't modify your global npm configuration  
-✅ **Full pass-through** - All npm/npx flags and arguments work exactly as expected  
+✅ **Concurrent execution** - Thử nhiều registry cùng lúc  
+✅ **Public-first strategy** - Thử public trước, fallback token sau  
+✅ **npm CLI delegation** - Không tự fetch, ủy quyền cho `npm view` / `npm install` / `npx`  
+✅ **Digit-based version comparison** - So sánh version theo digits (không semver)  
+✅ **Cross-platform** - Windows + Linux  
+✅ **Zero global config changes** - Không đụng npm config toàn cục
 
-## 🚀 Installation
+---
+
+## 🚀 Cài đặt
 
 ```bash
 npm install -g npmrtdb
 ```
 
-Or use directly with npx:
+Hoặc dùng trực tiếp:
 
 ```bash
 npx npmrtdb --db <url> install lodash
 ```
 
-## 📋 Usage
+---
+
+## 📋 Sử dụng
 
 ### npmrtdb (npm wrapper)
 
 ```bash
-# Basic usage
+# Cơ bản
 npmrtdb --db https://example.com/db.json install lodash
 
-# With latest version selection
+# Với mode latest (npm view để tìm version cao nhất)
 npmrtdb --db https://example.com/db.json --mode=latest install lodash
 
-# All npm flags work
+# Pass-through mọi flags
 npmrtdb install lodash --save-dev --legacy-peer-deps
 
-# Use -- to separate wrapper and npm args
+# Dùng -- để tách wrapper flags và npm args
 npmrtdb --db https://example.com/db.json --debug -- install lodash -D
 ```
 
 ### npmxrtdb (npx wrapper)
 
 ```bash
-# Execute packages from any available host
+# Execute package từ host nào có trước
 npmxrtdb --db https://example.com/db.json eslint --init
 
-# With latest version
+# Với latest version
 npmxrtdb --db https://example.com/db.json --mode=latest cowsay "Hello"
 
-# All npx flags work
+# Pass-through flags
 npmxrtdb --package=@angular/cli ng new my-app
 ```
 
-## ⚙️ Configuration
+---
 
-### Database URL
+## ⚙️ Database JSON
 
-The database URL can be provided via:
-- `--db <url>` flag
-- `MHNPM_DB_URL` environment variable
-
-### Database JSON Schema
+### Schema mới (object với key cố định)
 
 ```json
 {
-  "hosts": [
-    {
-      "name": "npmjs",
+  "hosts": {
+    "npmjs": {
       "registry": "https://registry.npmjs.org/",
       "enabled": true
     },
-    {
-      "name": "github",
+    "github": {
       "registry": "https://npm.pkg.github.com/",
       "scope": "@myorg",
       "auth": {
@@ -82,95 +80,113 @@ The database URL can be provided via:
       },
       "enabled": true
     },
-    {
-      "name": "gitea",
+    "gitea": {
       "registry": "https://gitea.example.com/api/packages/myorg/npm/",
       "auth": {
         "tokenEnv": "GITEA_TOKEN",
         "alwaysAuth": false
       },
-      "npmrcExtras": [
-        "strict-ssl=false"
-      ],
+      "npmrcExtras": ["strict-ssl=false"],
       "enabled": true
     }
-  ]
+  }
 }
 ```
 
-### Host Fields
+### Host fields
 
-- **name** (required): Human-readable identifier
-- **registry** (required): Registry URL
-- **enabled** (optional, default: true): Whether to use this host
-- **scope** (optional): Scope for scoped packages (e.g., `@myorg`)
-- **auth** (optional): Authentication configuration
-  - **tokenEnv**: Environment variable name containing auth token
-  - **alwaysAuth**: Whether to always send auth (default: false)
-- **npmrcExtras** (optional): Additional .npmrc lines
+- **registry** (required): URL registry
+- **enabled** (optional, default true): Bật/tắt host
+- **scope** (optional): Scope cho scoped packages (ví dụ `@myorg`)
+- **auth** (optional):
+  - **tokenEnv**: Tên biến môi trường chứa token
+  - **alwaysAuth**: Luôn gửi auth (default false)
+- **npmrcExtras** (optional): Các dòng `.npmrc` bổ sung
+
+### Env variables
+
+DB URL:
+
+- Flag `--db <url>`, hoặc
+- Env `MHNPM_DB_URL`
+
+Tokens:
+
+```bash
+export GITHUB_TOKEN="ghp_..."
+export GITEA_TOKEN="..."
+```
+
+---
 
 ## 🎛️ Wrapper Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--db <url>` | Database URL | `$MHNPM_DB_URL` |
-| `--mode <any\|latest>` | Version selection mode | `any` |
-| `--timeout <ms>` | Timeout per attempt | `30000` |
-| `--debug` | Enable debug logging | `false` |
-| `--json` | Output JSON result | `false` |
-| `--prefer-public` | Try public first | `true` |
-| `--help, -h` | Show help | - |
+| Flag                   | Mô tả               | Default         |
+| ---------------------- | ------------------- | --------------- |
+| `--db <url>`           | Database URL        | `$MHNPM_DB_URL` |
+| `--mode <any\|latest>` | Chế độ chọn version | `any`           |
+| `--timeout <ms>`       | Timeout mỗi attempt | `30000`         |
+| `--debug`              | Bật debug logging   | `false`         |
+| `--json`               | Output JSON         | `false`         |
+| `--prefer-public`      | Thử public trước    | `true`          |
+| `--help, -h`           | Hiện help           | -               |
 
-## 🔄 Execution Strategy
+---
+
+## 🔄 Chiến lược thực thi
 
 ### Stage 1: Public-first (Concurrent)
 
-All hosts without `alwaysAuth: true` are tried simultaneously without authentication.
+Tất cả hosts không có `alwaysAuth: true` sẽ chạy song song **không cần token**.
 
 ### Stage 2: Token fallback (Concurrent)
 
-If Stage 1 fails with authentication errors, hosts with available tokens are tried concurrently.
+Nếu Stage 1 fail với auth errors, các host có token sẽ chạy song song **với token**.
 
 ### Cancellation
 
-When any host succeeds, all other attempts are immediately cancelled to save resources.
+Host nào thành công trước → cancel toàn bộ host còn lại.
+
+---
 
 ## 🔢 Version Selection Modes
 
 ### `any` (default)
 
-Use the first host that successfully provides the package. Fastest option.
+Dùng host nào có package và chạy/cài được trước. **Nhanh nhất**.
 
 ### `latest`
 
-1. Fetch metadata from all hosts concurrently
-2. Collect all available versions
-3. Select the highest version using digit comparison
-4. Pin that exact version when installing/executing
-5. Only use hosts that have the selected version
+1. Chạy `npm view <package> versions --json` trên các hosts (song song)
+2. Gom tất cả versions
+3. Tìm version cao nhất theo **digit comparison**
+4. Pin version đó vào args
+5. Chạy install/exec với version pin
 
-**Digit Comparison Example:**
+**Digit Comparison:**
+
 - `1.260131.11534` → digits: `126013111534`
 - `11.0.15` → digits: `11015`
-- Winner: `1.260131.11534` (larger digit value)
+- Winner: `1.260131.11534` (số lớn hơn)
+
+---
 
 ## 🔐 Authentication
 
-Set environment variables for private registries:
+Set environment variables:
 
 ```bash
 export GITHUB_TOKEN="ghp_..."
 export GITEA_TOKEN="..."
-export NPM_TOKEN="..."
 ```
 
-The wrapper will automatically use tokens when needed based on host configuration.
+Wrapper tự động dùng token khi cần (Stage 2).
+
+---
 
 ## 🐛 Troubleshooting
 
 ### "All attempts failed"
-
-Enable debug mode to see detailed error messages:
 
 ```bash
 npmrtdb --debug install lodash
@@ -178,33 +194,30 @@ npmrtdb --debug install lodash
 
 ### "401 Unauthorized"
 
-Make sure your authentication tokens are set correctly:
+Check token:
 
 ```bash
-echo $GITHUB_TOKEN  # Should output your token
+echo $GITHUB_TOKEN
 ```
 
 ### Timeout errors
 
-Increase timeout if you have slow network:
+Tăng timeout:
 
 ```bash
 npmrtdb --timeout=60000 install lodash
 ```
 
-### No metadata found (latest mode)
-
-Some hosts might not respond in time. The wrapper will automatically retry with increased timeout.
+---
 
 ## 📊 JSON Output
-
-Use `--json` to get machine-readable output:
 
 ```bash
 npmrtdb --json --db https://example.com/db.json install lodash
 ```
 
 Output:
+
 ```json
 {
   "success": true,
@@ -214,16 +227,14 @@ Output:
 }
 ```
 
+---
+
 ## 🔧 Development
 
-### Local testing
-
 ```bash
-# Clone the repo
+# Clone & install
 git clone <repo-url>
 cd npmrtdb
-
-# Install dependencies
 npm install
 
 # Link locally
@@ -231,25 +242,16 @@ npm link
 
 # Test
 npmrtdb --help
-npmxrtdb --help
 ```
 
-### Run with debug
-
-```bash
-npmrtdb --debug --db <url> install lodash
-```
+---
 
 ## 📝 License
 
 MIT
 
+---
+
 ## 🙏 Credits
 
-Created by Huggin for efficient multi-host npm package management.
-
-## 🔗 Links
-
-- [npm documentation](https://docs.npmjs.com/)
-- [npx documentation](https://docs.npmjs.com/cli/v10/commands/npx)
-- [GitHub Packages npm registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry)
+Created by **Huggin** for efficient multi-host npm package management.

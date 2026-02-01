@@ -1,7 +1,7 @@
 {
   "name": "npmrtdb",
-  "version": "0.1.0",
-  "description": "Multi-host NPM/Npx wrapper with concurrent registry attempts and public-first strategy",
+  "version": "0.2.0",
+  "description": "Multi-host NPM/Npx wrapper - delegates to npm CLI for all network operations",
   "type": "module",
   "engines": {
     "node": ">=18.0.0"
@@ -11,8 +11,7 @@
     "npmxrtdb": "./bin/npmxrtdb.js"
   },
   "scripts": {
-    "test": "node test.js",
-    "prepublishOnly": "node test.js"
+    "test": "node test.js"
   },
   "keywords": [
     "npm",
@@ -26,6 +25,5 @@
   "license": "MIT",
   "dependencies": {
     "execa": "^8.0.1"
-  },
-  "devDependencies": {}
+  }
 }
