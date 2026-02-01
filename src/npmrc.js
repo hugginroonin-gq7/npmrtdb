@@ -30,8 +30,9 @@ export async function createTempNpmrc(host, token = null) {
       const registryUrl = new URL(host.registry);
       const registryHost = registryUrl.host;
       
-      // Format: //registry.host.com/:_authToken=TOKEN
-      lines.push(`//${registryHost}/:_authToken=${token}`);
+      // Format supports path registries (e.g. gitea): //host/path/:_authToken=TOKEN
+      const key = (registryUrl.host + registryUrl.pathname).replace(/\/?$/, '/');
+      lines.push(`//${key}:_authToken=${token}`);
     } catch (err) {
       debug(`Failed to parse registry URL for auth: ${err.message}`);
     }

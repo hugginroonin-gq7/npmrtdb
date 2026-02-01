@@ -5,8 +5,9 @@
 import { debug, info, error as logError } from './logger.js';
 import { createTempNpmrc, cleanupTemp } from './npmrc.js';
 import { runConcurrentAttempts, AllAttemptsFailedError, hasAuthError } from './executor.js';
-import { fetchAllMetadata, collectAllVersions, filterHostsWithVersion } from './metadata.js';
 import { findLatestVersion } from './version.js';
+import { getNpmCommand } from './platform.js';
+import { execa } from 'execa';
 
 /**
  * Build an attempt object
@@ -63,6 +64,48 @@ function pinVersionToArgs(args, packageName, version) {
   return newArgs;
 }
 
+async function collectVersionsViaNpmView(hosts, packageName, timeout, token = null) {
+  const npmCmd = getNpmCommand();
+  const viewArgs = ['view', packageName, 'versions', '--json'];
+
+  // Run all view commands concurrently and collect versions
+  const settled = await Promise.allSettled(hosts.map(async (host) => {
+    const { npmrcPath, tempDir } = await createTempNpmrc(host, token);
+    try {
+      const res = await execa(npmCmd, viewArgs, {
+        env: { ...process.env, NPM_CONFIG_USERCONFIG: npmrcPath },
+        timeout,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        reject: false,
+      });
+
+      if (res.exitCode !== 0) return [];
+
+      const out = (res.stdout || '').trim();
+      if (!out) return [];
+
+      try {
+        const parsed = JSON.parse(out);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+        if (typeof parsed === 'string') return [parsed];
+        return [];
+      } catch {
+        return [];
+      }
+    } finally {
+      await cleanupTemp(tempDir);
+    }
+  }));
+
+  const versions = [];
+  for (const s of settled) {
+    if (s.status === 'fulfilled' && Array.isArray(s.value)) {
+      versions.push(...s.value);
+    }
+  }
+  return versions;
+}
+
 /**
  * Orchestrate multi-host execution with 2-stage strategy
  */
@@ -77,36 +120,52 @@ export async function orchestrate(hosts, cmd, passThruArgs, options = {}) {
   let finalArgs = passThruArgs;
   let hostsToUse = hosts;
   
-  // Mode: latest - fetch metadata and pin version
+    // Mode: latest - use npm CLI (npm view) to collect versions and pin the max digits version
   if (mode === 'latest') {
     if (!packageName) {
       throw new Error('Package name is required for --mode=latest');
     }
-    
-    info('Mode: latest - fetching metadata from all hosts...');
-    
-    const metadataResults = await fetchAllMetadata(hosts, packageName, timeout);
-    const allVersions = collectAllVersions(metadataResults);
-    
+
+    info('Mode: latest - collecting versions via npm view...');
+
+    // Stage public for version discovery
+    const publicHostsForView = hostsToUse.filter(h => !h.auth?.alwaysAuth);
+    let allVersions = [];
+    if (publicHostsForView.length > 0) {
+      allVersions = await collectVersionsViaNpmView(publicHostsForView, packageName, timeout, null);
+    }
+
+    // If no versions found publicly, fallback to token hosts (if available)
+    if (allVersions.length === 0) {
+      const tokenEnvDefault = (h) => h.auth?.tokenEnv && process.env[h.auth.tokenEnv];
+      const tokenHostsForView = hostsToUse.filter(tokenEnvDefault);
+      if (tokenHostsForView.length === 0) {
+        throw new Error(`No versions found for package '${packageName}' (public failed and no tokens available)`);
+      }
+
+      // For view stage with tokens, each host can have different token env
+      const settled = await Promise.allSettled(tokenHostsForView.map(async (host) => {
+        const token = process.env[host.auth.tokenEnv];
+        return collectVersionsViaNpmView([host], packageName, timeout, token);
+      }));
+      for (const s of settled) {
+        if (s.status === 'fulfilled' && Array.isArray(s.value)) allVersions.push(...s.value);
+      }
+    }
+
     if (allVersions.length === 0) {
       throw new Error(`No versions found for package '${packageName}' across all hosts`);
     }
-    
+
     const latestVersion = findLatestVersion(allVersions);
     info(`Latest version: ${latestVersion}`);
-    
+
     // Pin version to args
     finalArgs = pinVersionToArgs(passThruArgs, packageName, latestVersion);
     debug(`Pinned args: ${finalArgs.join(' ')}`);
-    
-    // Filter hosts that have this version
-    hostsToUse = filterHostsWithVersion(metadataResults, latestVersion);
-    
-    if (hostsToUse.length === 0) {
-      throw new Error(`No hosts have version ${latestVersion} of '${packageName}'`);
-    }
-    
-    debug(`Hosts with version ${latestVersion}: ${hostsToUse.map(h => h.name).join(', ')}`);
+
+    // Do NOT pre-filter hosts here; just attempt them concurrently (hosts without this version will fail fast)
+    hostsToUse = hostsToUse;
   }
   
   // Stage 1: Public-first (concurrent)

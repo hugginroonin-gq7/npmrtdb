@@ -33,17 +33,15 @@ export async function runConcurrentAttempts(attempts, timeout) {
   if (attempts.length === 0) {
     throw new Error('No attempts to run');
   }
-  
+
   debug(`Starting ${attempts.length} concurrent attempt(s) with ${timeout}ms timeout each`);
-  
+
   const controller = new AbortController();
-  const results = [];
-  
-  // Create promises for all attempts
-  const promises = attempts.map(async (attempt, index) => {
+
+  // Each attempt resolves with winner info, or rejects with an error carrying host context
+  const wrapped = attempts.map((attempt, index) => (async () => {
+    const startTime = Date.now();
     try {
-      const startTime = Date.now();
-      
       await executeAttempt(
         attempt.cmd,
         attempt.args,
@@ -51,78 +49,56 @@ export async function runConcurrentAttempts(attempts, timeout) {
         controller.signal,
         timeout
       );
-      
+
       const elapsed = Date.now() - startTime;
-      
       debug(`✓ Host '${attempt.host.name}' succeeded in ${elapsed}ms`);
-      
-      return {
-        success: true,
-        host: attempt.host,
-        elapsed,
-        index,
-      };
+
+      return { success: true, host: attempt.host, elapsed, index };
     } catch (error) {
-      // Check if cancelled by AbortController
-      if (error.name === 'AbortError' || controller.signal.aborted) {
+      // If aborted, mark as cancelled
+      if (error?.name === 'AbortError' || controller.signal.aborted) {
         debug(`✗ Host '${attempt.host.name}' cancelled`);
-        return {
-          success: false,
-          cancelled: true,
-          host: attempt.host,
-          index,
-        };
+        const e = Object.assign(new Error('cancelled'), { cancelled: true, host: attempt.host, index });
+        throw e;
       }
-      
+
       debug(`✗ Host '${attempt.host.name}' failed: ${error.message}`);
-      
-      return {
-        success: false,
-        error,
-        host: attempt.host,
-        index,
-      };
+      // Attach host context for aggregation
+      error.host = attempt.host;
+      error.index = index;
+      throw error;
     }
-  });
-  
-  // Wait for first success or all failures
+  })());
+
   try {
-    const settled = await Promise.allSettled(promises);
-    
-    // Find first successful result
-    for (const result of settled) {
-      if (result.status === 'fulfilled' && result.value.success) {
-        const winner = result.value;
-        
-        debug(`Winner: Host '${winner.host.name}' (${winner.elapsed}ms)`);
-        
-        // Cancel all other attempts
-        controller.abort();
-        
-        // Wait a bit for cancellation to propagate
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        return winner;
-      }
-    }
-    
-    // All failed - collect errors
-    const errors = settled
-      .map(r => r.status === 'fulfilled' ? r.value : null)
-      .filter(r => r && !r.success && !r.cancelled)
-      .map(r => ({
-        host: r.host.name,
-        error: r.error?.message || 'Unknown error',
-        stderr: r.error?.stderr || '',
-        exitCode: r.error?.exitCode,
-      }));
-    
-    throw new AllAttemptsFailedError('All attempts failed', errors);
-  } finally {
-    // Ensure controller is aborted
+    const winner = await Promise.any(wrapped);
+
+    debug(`Winner: Host '${winner.host.name}' (${winner.elapsed}ms)`);
+
+    // Cancel all other attempts immediately
     controller.abort();
+
+    // Give a moment for cancellation to propagate
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    return winner;
+  } catch (agg) {
+    controller.abort();
+
+    // Promise.any throws AggregateError when all rejected
+    const errors = (agg?.errors || [])
+      .filter(e => e && !e.cancelled)
+      .map(e => ({
+        host: e.host?.name || 'unknown',
+        error: e.message || 'Unknown error',
+        stderr: e.stderr || '',
+        exitCode: e.exitCode,
+      }));
+
+    throw new AllAttemptsFailedError('All attempts failed', errors);
   }
 }
+
 
 /**
  * Custom error for all attempts failed

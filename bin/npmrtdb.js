@@ -12,8 +12,11 @@ import { showHelp } from '../src/help.js';
 import { getNpmCommand } from '../src/platform.js';
 
 async function main() {
+  let wrapperFlags;
   try {
-    const { wrapperFlags, passThruArgs } = parseArgs(process.argv.slice(2));
+    const parsed = parseArgs(process.argv.slice(2));
+    wrapperFlags = parsed.wrapperFlags;
+    const passThruArgs = parsed.passThruArgs;
     
     // Enable debug mode if requested
     if (wrapperFlags.debug) {

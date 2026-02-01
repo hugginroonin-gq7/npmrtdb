@@ -19,7 +19,7 @@ WRAPPER OPTIONS:
 
 MODES:
   any       Use first available host with package (fastest)
-  latest    Fetch metadata, select highest version by digits, pin version
+  latest    Use npm view, select highest version by digits, pin version
 
 EXAMPLES:
   # Install lodash using any available host
@@ -61,7 +61,7 @@ WRAPPER OPTIONS:
 
 MODES:
   any       Use first available host with package (fastest)
-  latest    Fetch metadata, select highest version by digits, pin version
+  latest    Use npm view, select highest version by digits, pin version
 
 EXAMPLES:
   # Execute eslint from any available host
